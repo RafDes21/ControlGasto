@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -66,6 +67,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.remote.config)
+    implementation(libs.firebase.crashlytics)
     ksp(libs.hilt.compiler)
     ksp(libs.room.compiler)
     testImplementation(libs.junit)
