@@ -21,4 +21,7 @@ interface CategoryDao {
 
     @Query("SELECT * FROM categories ORDER BY isDefault DESC, name ASC")
     suspend fun getAllOnce(): List<CategoryEntity>
+
+    @Query("DELETE FROM categories")
+    suspend fun deleteAll()
 }

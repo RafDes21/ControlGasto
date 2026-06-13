@@ -8,4 +8,5 @@ interface CategoryRepository {
     suspend fun addCategory(category: Category)
     suspend fun deleteCategory(category: Category)
     suspend fun downgradeCategories()
+    suspend fun syncToRoomOnLogout()
 }

@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import com.controlgasto.app.presentation.navigation.NavGraph
 import com.controlgasto.app.ui.theme.ControlGastoTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.core.net.toUri
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
     private fun openUrl(url: String) {
         if (url.isBlank()) return
         try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         } catch (e: Exception) { }

@@ -13,4 +13,5 @@ interface ExpenseRepository {
     suspend fun getExpenseById(id: String): Expense?
     suspend fun downgradeExpenses(deletedCardIds: Set<String>)
     suspend fun deleteExpensesByCardId(cardId: String)
+    suspend fun syncToRoomOnLogout()
 }
