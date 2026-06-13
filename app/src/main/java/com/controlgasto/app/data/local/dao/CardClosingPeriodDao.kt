@@ -29,4 +29,10 @@ interface CardClosingPeriodDao {
 
     @Query("DELETE FROM card_closing_periods WHERE cardId = :cardId")
     suspend fun deleteByCardId(cardId: String)
+
+    @Query("SELECT * FROM card_closing_periods")
+    suspend fun getAllOnce(): List<CardClosingPeriodEntity>
+
+    @Query("DELETE FROM card_closing_periods")
+    suspend fun deleteAll()
 }

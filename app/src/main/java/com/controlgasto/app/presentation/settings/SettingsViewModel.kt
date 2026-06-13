@@ -96,8 +96,6 @@ class SettingsViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
-            expenseRepository.downgradeExpenses(emptySet())
-            creditCardRepository.syncToRoomOnLogout()
             authRepository.logout()
         }
     }

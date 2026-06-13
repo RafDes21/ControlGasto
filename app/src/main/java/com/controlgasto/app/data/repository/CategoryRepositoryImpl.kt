@@ -39,13 +39,12 @@ class CategoryRepositoryImpl @Inject constructor(
 
     init {
         scope.launch {
-            if (dao.count() == 0) {
-                AppDatabase.getDefaultCategories().forEach { dao.insert(it) }
-            }
-        }
-        scope.launch {
             authStateFlow.collect { uid ->
-                if (uid != null) migrateRoomToFirestore()
+                if (uid != null) {
+                    migrateRoomToFirestore(uid)
+                } else if (dao.count() == 0) {
+                    AppDatabase.getDefaultCategories().forEach { dao.insert(it) }
+                }
             }
         }
     }
@@ -77,8 +76,23 @@ class CategoryRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun migrateRoomToFirestore() {
+    override suspend fun syncToRoomOnLogout() {
         val currentUid = uid ?: return
+        // Restaurar a Room (se llama antes de signOut, uid todavía válido)
+        runCatching {
+            val firestoreCategories = firestoreSource.getCategoriesOnce(currentUid)
+            dao.deleteAll()
+            if (firestoreCategories.isNotEmpty()) {
+                firestoreCategories.forEach { dao.insert(it.toEntity()) }
+            } else {
+                AppDatabase.getDefaultCategories().forEach { dao.insert(it) }
+            }
+        }
+        // Borrar de Firestore por separado para no dejar Room vacío si esto falla
+        runCatching { firestoreSource.deleteAllCategories(currentUid) }
+    }
+
+    private suspend fun migrateRoomToFirestore(currentUid: String) {
         runCatching {
             val existing = firestoreSource.getCategoriesOnce(currentUid)
             if (existing.isEmpty()) {
@@ -92,6 +106,8 @@ class CategoryRepositoryImpl @Inject constructor(
                     !entity.isDefault && existing.none { it.id == entity.id }
                 }.forEach { firestoreSource.addCategory(currentUid, it.toDomain()) }
             }
+            // Limpiar Room: estando logueado, la fuente de verdad es Firestore
+            dao.deleteAll()
         }
     }
 }

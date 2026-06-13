@@ -46,25 +46,21 @@ class FirestoreCreditCardSource @Inject constructor(
         userCards(uid).document(card.id).delete().await()
     }
 
-    suspend fun getCardsOnce(uid: String): List<CreditCard> {
-        return runCatching {
-            val snapshot = userCards(uid).get().await()
-            snapshot.documents.mapNotNull { doc ->
-                runCatching {
-                    CreditCard(
-                        id = doc.id,
-                        name = doc.getString("name") ?: "",
-                        lastFourDigits = doc.getString("lastFourDigits") ?: "",
-                        dueDay = (doc.getLong("dueDay") ?: 1).toInt(),
-                        closingDay = (doc.getLong("closingDay") ?: 28).toInt(),
-                        colorHex = doc.getLong("colorHex") ?: 0xFF1565C0L,
-                        bank = doc.getString("bank") ?: "",
-                        type = doc.getString("type") ?: "credit"
-                    )
-                }.getOrNull()
-            }
-        }.getOrDefault(emptyList())
-    }
+    suspend fun getCardsOnce(uid: String): List<CreditCard> =
+        userCards(uid).get().await().documents.mapNotNull { doc ->
+            runCatching {
+                CreditCard(
+                    id = doc.id,
+                    name = doc.getString("name") ?: "",
+                    lastFourDigits = doc.getString("lastFourDigits") ?: "",
+                    dueDay = (doc.getLong("dueDay") ?: 1).toInt(),
+                    closingDay = (doc.getLong("closingDay") ?: 28).toInt(),
+                    colorHex = doc.getLong("colorHex") ?: 0xFF1565C0L,
+                    bank = doc.getString("bank") ?: "",
+                    type = doc.getString("type") ?: "credit"
+                )
+            }.getOrNull()
+        }
 
     suspend fun getCardById(uid: String, id: String): CreditCard? {
         val doc = userCards(uid).document(id).get().await()

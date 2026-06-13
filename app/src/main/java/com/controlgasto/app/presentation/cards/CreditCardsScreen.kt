@@ -30,6 +30,7 @@ import androidx.navigation.NavController
 import com.controlgasto.app.data.util.BillingPeriodHelper
 import com.controlgasto.app.domain.model.CardClosingPeriod
 import com.controlgasto.app.domain.model.CreditCard
+import java.util.Calendar
 
 private val cardPalette = listOf(
     0xFF1565C0L, 0xFF6A1B9AL, 0xFF00695CL,
@@ -99,8 +100,8 @@ fun CreditCardsScreen(
                         onEdit = { name, lastFour, dueDay, closingDay, colorHex ->
                             viewModel.updateCard(card, name, lastFour, dueDay, closingDay, colorHex)
                         },
-                        onUpdatePeriodClosingDay = { period, newDay, fromForward ->
-                            viewModel.updatePeriodClosingDay(period, newDay, fromForward)
+                        onUpdatePeriodDays = { period, newClosingDay, newDueDay, fromForward ->
+                            viewModel.updatePeriodDays(period, newClosingDay, newDueDay, fromForward)
                         }
                     )
                 }
@@ -115,12 +116,18 @@ private fun CreditCardItem(
     periods: List<CardClosingPeriod>,
     onDelete: () -> Unit,
     onEdit: (String, String, Int, Int, Long) -> Unit,
-    onUpdatePeriodClosingDay: (CardClosingPeriod, Int, Boolean) -> Unit
+    onUpdatePeriodDays: (CardClosingPeriod, Int, Int, Boolean) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     var periodToEdit by remember { mutableStateOf<CardClosingPeriod?>(null) }
+
+    val currentPeriod = remember(periods) { periods.find { it.month == BillingPeriodHelper.currentMonth() } }
+    val displayClosingDay = currentPeriod?.closingDay ?: card.closingDay
+    val displayDueDay = currentPeriod?.let {
+        Calendar.getInstance().apply { timeInMillis = it.dueDate }.get(Calendar.DAY_OF_MONTH)
+    } ?: card.dueDay
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -139,6 +146,8 @@ private fun CreditCardItem(
     if (showEditDialog) {
         EditCardDialog(
             card = card,
+            initialClosingDay = displayClosingDay,
+            initialDueDay = displayDueDay,
             onDismiss = { showEditDialog = false },
             onConfirm = { name, lastFour, dueDay, closingDay, colorHex ->
                 onEdit(name, lastFour, dueDay, closingDay, colorHex)
@@ -151,8 +160,8 @@ private fun CreditCardItem(
         EditPeriodDialog(
             period = period,
             onDismiss = { periodToEdit = null },
-            onConfirm = { newDay, fromForward ->
-                onUpdatePeriodClosingDay(period, newDay, fromForward)
+            onConfirm = { newClosingDay, newDueDay, fromForward ->
+                onUpdatePeriodDays(period, newClosingDay, newDueDay, fromForward)
                 periodToEdit = null
             }
         )
@@ -180,12 +189,12 @@ private fun CreditCardItem(
                     Text("···· ···· ···· ${card.lastFourDigits}", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         Column {
-                            Text("Vencimiento", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
-                            Text("Día ${card.dueDay}", color = Color.White, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            Text("Cierre", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+                            Text("Día $displayClosingDay", color = Color.White, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                         }
                         Column {
-                            Text("Cierre", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
-                            Text("Día ${card.closingDay}", color = Color.White, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            Text("Vencimiento", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+                            Text("Día $displayDueDay", color = Color.White, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                         }
                     }
                     Row(
@@ -208,18 +217,27 @@ private fun CreditCardItem(
                 }
             }
 
-            if (expanded && periods.isNotEmpty()) {
-                val year = periods.first().month.split("-")[0]
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                    Text(
-                        "Períodos $year",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    periods.forEach { period ->
-                        PeriodRow(period = period, onEdit = { periodToEdit = period })
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            if (expanded) {
+                if (periods.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
+                } else {
+                    val year = periods.first().month.split("-")[0]
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                        Text(
+                            "Períodos $year",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        periods.forEach { period ->
+                            PeriodRow(period = period, onEdit = { periodToEdit = period })
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        }
                     }
                 }
             }
@@ -252,24 +270,38 @@ private fun PeriodRow(period: CardClosingPeriod, onEdit: () -> Unit) {
 private fun EditPeriodDialog(
     period: CardClosingPeriod,
     onDismiss: () -> Unit,
-    onConfirm: (Int, Boolean) -> Unit
+    onConfirm: (Int, Int, Boolean) -> Unit
 ) {
+    val initialDueDay = remember {
+        Calendar.getInstance().apply { timeInMillis = period.dueDate }.get(Calendar.DAY_OF_MONTH)
+    }
     var closingDayText by remember { mutableStateOf(period.closingDay.toString()) }
+    var dueDayText by remember { mutableStateOf(initialDueDay.toString()) }
     var fromForward by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Editar cierre — ${BillingPeriodHelper.monthLabel(period.month)}") },
+        title = { Text("Editar período — ${BillingPeriodHelper.monthLabel(period.month)}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = closingDayText,
-                    onValueChange = { closingDayText = it },
-                    label = { Text("Día de cierre (1–28)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = closingDayText,
+                        onValueChange = { closingDayText = it },
+                        label = { Text("Cierra día") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = dueDayText,
+                        onValueChange = { dueDayText = it },
+                        label = { Text("Vence día") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
+                }
                 Text("Aplicar a:", style = MaterialTheme.typography.labelMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { fromForward = false },
@@ -289,8 +321,9 @@ private fun EditPeriodDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                val day = closingDayText.toIntOrNull()?.coerceIn(1, 28) ?: return@TextButton
-                onConfirm(day, fromForward)
+                val closing = closingDayText.toIntOrNull()?.coerceIn(1, 31) ?: return@TextButton
+                val due = dueDayText.toIntOrNull()?.coerceIn(1, 31) ?: return@TextButton
+                onConfirm(closing, due, fromForward)
             }) { Text("Guardar") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
@@ -325,13 +358,13 @@ private fun AddCardDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = dueDay, onValueChange = { dueDay = it },
-                        label = { Text("Vence día") }, modifier = Modifier.weight(1f),
+                        value = closingDay, onValueChange = { closingDay = it },
+                        label = { Text("Cierra día") }, modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
                     )
                     OutlinedTextField(
-                        value = closingDay, onValueChange = { closingDay = it },
-                        label = { Text("Cierra día") }, modifier = Modifier.weight(1f),
+                        value = dueDay, onValueChange = { dueDay = it },
+                        label = { Text("Vence día") }, modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
                     )
                 }
@@ -369,13 +402,15 @@ private fun AddCardDialog(
 @Composable
 private fun EditCardDialog(
     card: CreditCard,
+    initialClosingDay: Int,
+    initialDueDay: Int,
     onDismiss: () -> Unit,
     onConfirm: (String, String, Int, Int, Long) -> Unit
 ) {
     var name by remember { mutableStateOf(card.name) }
     var lastFour by remember { mutableStateOf(card.lastFourDigits) }
-    var dueDay by remember { mutableStateOf(card.dueDay.toString()) }
-    var closingDay by remember { mutableStateOf(card.closingDay.toString()) }
+    var dueDay by remember { mutableStateOf(initialDueDay.toString()) }
+    var closingDay by remember { mutableStateOf(initialClosingDay.toString()) }
     var selectedColor by remember { mutableStateOf(card.colorHex) }
 
     AlertDialog(
@@ -395,13 +430,13 @@ private fun EditCardDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = dueDay, onValueChange = { dueDay = it },
-                        label = { Text("Vence día") }, modifier = Modifier.weight(1f),
+                        value = closingDay, onValueChange = { closingDay = it },
+                        label = { Text("Cierra día") }, modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
                     )
                     OutlinedTextField(
-                        value = closingDay, onValueChange = { closingDay = it },
-                        label = { Text("Cierra día") }, modifier = Modifier.weight(1f),
+                        value = dueDay, onValueChange = { dueDay = it },
+                        label = { Text("Vence día") }, modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
                     )
                 }

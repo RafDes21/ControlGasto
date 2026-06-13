@@ -172,6 +172,16 @@ class ExpenseRepositoryImpl @Inject constructor(
         else dao.deleteByCardId(cardId)
     }
 
+    override suspend fun syncToRoomOnLogout() {
+        val currentUid = uid ?: return
+        runCatching {
+            val firestoreExpenses = firestoreSource.getExpensesOnce(currentUid)
+            dao.deleteAll()
+            firestoreExpenses.forEach { dao.insert(it.toEntity()) }
+        }
+        runCatching { firestoreSource.deleteAllExpenses(currentUid) }
+    }
+
     private suspend fun migrateRoomToFirestore() {
         val currentUid = uid ?: return
         val roomExpenses = dao.getAllOnce()

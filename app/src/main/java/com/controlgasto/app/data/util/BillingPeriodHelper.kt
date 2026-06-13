@@ -53,27 +53,36 @@ object BillingPeriodHelper {
         }
 
     fun buildPeriod(cardId: String, year: Int, month: Int, closingDay: Int, dueDay: Int): CardClosingPeriod {
-        val safeClosingDay = closingDay.coerceIn(1, 28)
-        val safeDueDay = dueDay.coerceIn(1, 28)
+        val safeClosingDay = closingDay.coerceIn(1, 31)
+        val safeDueDay = dueDay.coerceIn(1, 31)
 
         val periodEnd = Calendar.getInstance().apply {
-            set(year, month - 1, safeClosingDay, 23, 59, 59)
-            set(Calendar.MILLISECOND, 999)
+            set(year, month - 1, 1)
+            val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+            set(Calendar.DAY_OF_MONTH, safeClosingDay.coerceAtMost(maxDay))
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999)
         }.timeInMillis
 
         val prevMonth = if (month == 1) 12 else month - 1
         val prevYear = if (month == 1) year - 1 else year
         val periodStart = Calendar.getInstance().apply {
-            set(prevYear, prevMonth - 1, safeClosingDay, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
+            set(prevYear, prevMonth - 1, 1)
+            val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+            set(Calendar.DAY_OF_MONTH, safeClosingDay.coerceAtMost(maxDay))
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
             add(Calendar.DAY_OF_MONTH, 1)
         }.timeInMillis
 
         val nextMonth = if (month == 12) 1 else month + 1
         val nextYear = if (month == 12) year + 1 else year
         val dueDate = Calendar.getInstance().apply {
-            set(nextYear, nextMonth - 1, safeDueDay, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
+            set(nextYear, nextMonth - 1, 1)
+            val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+            set(Calendar.DAY_OF_MONTH, safeDueDay.coerceAtMost(maxDay))
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
         return CardClosingPeriod(
@@ -87,12 +96,11 @@ object BillingPeriodHelper {
         )
     }
 
-    fun recalculatePeriod(existing: CardClosingPeriod, newClosingDay: Int): CardClosingPeriod {
+    fun recalculatePeriod(existing: CardClosingPeriod, newClosingDay: Int, newDueDay: Int? = null): CardClosingPeriod {
         val parts = existing.month.split("-")
         val year = parts[0].toInt()
         val month = parts[1].toInt()
-        val dueDayCal = Calendar.getInstance().apply { timeInMillis = existing.dueDate }
-        val dueDay = dueDayCal.get(Calendar.DAY_OF_MONTH)
+        val dueDay = newDueDay ?: Calendar.getInstance().apply { timeInMillis = existing.dueDate }.get(Calendar.DAY_OF_MONTH)
         return buildPeriod(existing.cardId, year, month, newClosingDay, dueDay)
             .copy(id = existing.id, createdAt = existing.createdAt)
     }

@@ -24,4 +24,7 @@ interface CreditCardDao {
 
     @Delete
     suspend fun delete(card: CreditCardEntity)
+
+    @Query("DELETE FROM credit_cards")
+    suspend fun deleteAll()
 }

@@ -76,30 +76,37 @@ class CreditCardRepositoryImpl @Inject constructor(
 
     override suspend fun downgradeToFree(cardToKeep: CreditCard) {
         val currentUid = uid ?: return
-        val allCards = firestoreSource.getCardsOnce(currentUid)
-        allCards.forEach { firestoreSource.deleteCard(currentUid, it) }
+        runCatching {
+            val allCards = firestoreSource.getCardsOnce(currentUid)
+            allCards.forEach { firestoreSource.deleteCard(currentUid, it) }
+        }
         dao.insert(cardToKeep.toEntity())
     }
 
     override suspend fun syncToRoomOnLogout() {
         val currentUid = uid ?: return
+        val firestoreCards = runCatching { firestoreSource.getCardsOnce(currentUid) }.getOrNull() ?: return
         runCatching {
-            val firestoreCards = firestoreSource.getCardsOnce(currentUid)
+            dao.deleteAll()
             firestoreCards.forEach { card -> dao.insert(card.toEntity()) }
+        }
+        runCatching {
             firestoreCards.forEach { card -> firestoreSource.deleteCard(currentUid, card) }
         }
     }
 
     private suspend fun migrateRoomToFirestore() {
         val currentUid = uid ?: return
-        val roomCards = dao.getAllOnce()
-        if (roomCards.isEmpty()) return
-        val firestoreCards = firestoreSource.getCardsOnce(currentUid)
-        roomCards.forEach { entity ->
-            if (firestoreCards.none { it.id == entity.id }) {
-                firestoreSource.addCard(currentUid, entity.toDomain())
+        runCatching {
+            val roomCards = dao.getAllOnce()
+            if (roomCards.isEmpty()) return@runCatching
+            val firestoreCards = firestoreSource.getCardsOnce(currentUid)
+            roomCards.forEach { entity ->
+                if (firestoreCards.none { it.id == entity.id }) {
+                    firestoreSource.addCard(currentUid, entity.toDomain())
+                }
             }
+            dao.deleteAll()
         }
-        roomCards.forEach { dao.delete(it) }
     }
 }

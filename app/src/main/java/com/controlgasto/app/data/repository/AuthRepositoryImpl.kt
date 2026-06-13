@@ -3,6 +3,10 @@ package com.controlgasto.app.data.repository
 import com.controlgasto.app.core.UserPreferences
 import com.controlgasto.app.domain.model.User
 import com.controlgasto.app.domain.repository.AuthRepository
+import com.controlgasto.app.domain.repository.CardClosingPeriodRepository
+import com.controlgasto.app.domain.repository.CategoryRepository
+import com.controlgasto.app.domain.repository.CreditCardRepository
+import com.controlgasto.app.domain.repository.ExpenseRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +25,11 @@ import javax.inject.Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val prefs: UserPreferences
+    private val prefs: UserPreferences,
+    private val categoryRepository: CategoryRepository,
+    private val creditCardRepository: CreditCardRepository,
+    private val cardClosingPeriodRepository: CardClosingPeriodRepository,
+    private val expenseRepository: ExpenseRepository
 ) : AuthRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -84,6 +92,11 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun logout() {
         proListenerJob?.cancel()
         proListenerJob = null
+        // Sincronizar todo a Room y limpiar Firestore ANTES de cerrar sesión
+        categoryRepository.syncToRoomOnLogout()
+        expenseRepository.syncToRoomOnLogout()
+        creditCardRepository.syncToRoomOnLogout()
+        cardClosingPeriodRepository.syncToRoomOnLogout()
         firebaseAuth.signOut()
         _currentUser.value = null
         prefs.clearUserSession()
