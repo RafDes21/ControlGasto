@@ -91,6 +91,27 @@ class CardClosingPeriodRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateFromDates(cardId: String, fromMonth: String, closingDay: Int, dueDaysOffset: Int) {
+        val currentUid = uid
+        if (currentUid != null) {
+            firestoreSource.getPeriodsOnceForCard(currentUid, cardId)
+                .filter { it.month >= fromMonth }
+                .forEach { p ->
+                    val parts = p.month.split("-")
+                    val updated = BillingPeriodHelper.buildPeriodWithOffset(cardId, parts[0].toInt(), parts[1].toInt(), closingDay, dueDaysOffset)
+                        .copy(id = p.id, createdAt = p.createdAt)
+                    firestoreSource.update(currentUid, updated)
+                }
+        } else {
+            dao.getFromMonth(cardId, fromMonth).forEach { p ->
+                val parts = p.month.split("-")
+                val updated = BillingPeriodHelper.buildPeriodWithOffset(cardId, parts[0].toInt(), parts[1].toInt(), closingDay, dueDaysOffset)
+                    .copy(id = p.id, createdAt = p.createdAt)
+                dao.update(updated.toEntity())
+            }
+        }
+    }
+
     override suspend fun deleteByCardId(cardId: String) {
         val currentUid = uid
         if (currentUid != null) firestoreSource.deleteByCardId(currentUid, cardId)

@@ -96,6 +96,76 @@ object BillingPeriodHelper {
         )
     }
 
+    // Genera 12 períodos desde la fecha de cierre elegida, usando el offset real entre cierre y vencimiento
+    fun generatePeriodsFromDates(cardId: String, closingMillis: Long, dueMillis: Long): List<CardClosingPeriod> {
+        val cal = Calendar.getInstance().apply { timeInMillis = closingMillis }
+        val closingDay = cal.get(Calendar.DAY_OF_MONTH)
+        val startYear = cal.get(Calendar.YEAR)
+        val startMonth = cal.get(Calendar.MONTH) + 1
+        val dueDaysOffset = ((dueMillis - closingMillis) / (24L * 60 * 60 * 1000)).toInt()
+        return (0 until 12).map { offset ->
+            val total = (startMonth - 1) + offset
+            buildPeriodWithOffset(cardId, startYear + total / 12, total % 12 + 1, closingDay, dueDaysOffset)
+        }
+    }
+
+    // Construye un período usando un offset en días entre cierre y vencimiento (soporta mismo mes o siguiente)
+    fun buildPeriodWithOffset(cardId: String, year: Int, month: Int, closingDay: Int, dueDaysOffset: Int): CardClosingPeriod {
+        val safeClosingDay = closingDay.coerceIn(1, 31)
+
+        val periodEnd = Calendar.getInstance().apply {
+            set(year, month - 1, 1)
+            val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+            set(Calendar.DAY_OF_MONTH, safeClosingDay.coerceAtMost(maxDay))
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        val prevMonth = if (month == 1) 12 else month - 1
+        val prevYear = if (month == 1) year - 1 else year
+        val periodStart = Calendar.getInstance().apply {
+            set(prevYear, prevMonth - 1, 1)
+            val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+            set(Calendar.DAY_OF_MONTH, safeClosingDay.coerceAtMost(maxDay))
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_MONTH, 1)
+        }.timeInMillis
+
+        val dueDate = Calendar.getInstance().apply {
+            timeInMillis = periodEnd
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_MONTH, dueDaysOffset)
+        }.timeInMillis
+
+        return CardClosingPeriod(
+            id = UUID.randomUUID().toString(),
+            cardId = cardId,
+            month = formatMonth(year, month),
+            closingDay = safeClosingDay,
+            dueDate = dueDate,
+            periodStart = periodStart,
+            periodEnd = periodEnd
+        )
+    }
+
+    // Recalcula un período individual con fechas exactas elegidas por el usuario
+    fun buildPeriodFromExactDates(existing: CardClosingPeriod, closingMillis: Long, dueMillis: Long): CardClosingPeriod {
+        val newClosingDay = Calendar.getInstance().apply { timeInMillis = closingMillis }.get(Calendar.DAY_OF_MONTH)
+        val periodEnd = Calendar.getInstance().apply {
+            timeInMillis = closingMillis
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+        val dueDate = Calendar.getInstance().apply {
+            timeInMillis = dueMillis
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return existing.copy(closingDay = newClosingDay, periodEnd = periodEnd, dueDate = dueDate)
+    }
+
     fun recalculatePeriod(existing: CardClosingPeriod, newClosingDay: Int, newDueDay: Int? = null): CardClosingPeriod {
         val parts = existing.month.split("-")
         val year = parts[0].toInt()

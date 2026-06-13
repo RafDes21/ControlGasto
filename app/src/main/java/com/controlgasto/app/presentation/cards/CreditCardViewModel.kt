@@ -49,51 +49,43 @@ class CreditCardViewModel @Inject constructor(
                 .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5000), replay = 1)
         }
 
-    fun addCard(name: String, lastFour: String, dueDay: Int, closingDay: Int, colorHex: Long) {
-        val state = uiState.value
-        if (!state.canAddCard) return
-        if (name.isBlank() || lastFour.isBlank()) return
+    fun addCard(name: String, lastFour: String, closingDateMillis: Long, dueDateMillis: Long, colorHex: Long) {
+        if (!uiState.value.canAddCard) return
+        if (name.isBlank()) return
+        val closingCal = Calendar.getInstance().apply { timeInMillis = closingDateMillis }
+        val dueCal = Calendar.getInstance().apply { timeInMillis = dueDateMillis }
         val card = CreditCard(
             id = UUID.randomUUID().toString(),
             name = name.trim(),
             lastFourDigits = lastFour.trim(),
-            dueDay = dueDay,
-            closingDay = closingDay,
+            closingDay = closingCal.get(Calendar.DAY_OF_MONTH),
+            dueDay = dueCal.get(Calendar.DAY_OF_MONTH),
             colorHex = colorHex
         )
         viewModelScope.launch {
-            val cal = Calendar.getInstance()
-            val year = cal.get(Calendar.YEAR)
-            val month = cal.get(Calendar.MONTH) + 1
-            val periods = BillingPeriodHelper.generatePeriodsFromMonth(card.id, closingDay, dueDay, year, month)
-            // Insertar períodos ANTES de la tarjeta para que estén disponibles
-            // cuando el listener de Firestore dispare la actualización de cards
+            val periods = BillingPeriodHelper.generatePeriodsFromDates(card.id, closingDateMillis, dueDateMillis)
             cardClosingPeriodRepository.insertAll(periods)
             creditCardRepository.addCreditCard(card)
         }
     }
 
-    fun updateCard(card: CreditCard, name: String, lastFour: String, dueDay: Int, closingDay: Int, colorHex: Long) {
-        if (name.isBlank() || lastFour.isBlank()) return
+    fun updateCard(card: CreditCard, name: String, lastFour: String, closingDateMillis: Long, dueDateMillis: Long, colorHex: Long, currentPeriod: CardClosingPeriod?) {
+        if (name.isBlank()) return
+        val closingCal = Calendar.getInstance().apply { timeInMillis = closingDateMillis }
+        val dueCal = Calendar.getInstance().apply { timeInMillis = dueDateMillis }
+        val newClosingDay = closingCal.get(Calendar.DAY_OF_MONTH)
+        val newDueDay = dueCal.get(Calendar.DAY_OF_MONTH)
         viewModelScope.launch {
-            creditCardRepository.updateCreditCard(
-                card.copy(
-                    name = name.trim(),
-                    lastFourDigits = lastFour.trim(),
-                    dueDay = dueDay,
-                    closingDay = closingDay,
-                    colorHex = colorHex
-                )
-            )
-            if (closingDay != card.closingDay || dueDay != card.dueDay) {
-                val currentMonth = BillingPeriodHelper.currentMonth()
-                val currentPeriod = cardClosingPeriodRepository.getPeriodForCardAndMonth(card.id, currentMonth)
-                if (currentPeriod != null) {
-                    val parts = currentMonth.split("-")
-                    val updated = BillingPeriodHelper.buildPeriod(card.id, parts[0].toInt(), parts[1].toInt(), closingDay, dueDay)
-                        .copy(id = currentPeriod.id, createdAt = currentPeriod.createdAt)
-                    cardClosingPeriodRepository.update(updated)
-                }
+            creditCardRepository.updateCreditCard(card.copy(
+                name = name.trim(),
+                lastFourDigits = lastFour.trim(),
+                closingDay = newClosingDay,
+                dueDay = newDueDay,
+                colorHex = colorHex
+            ))
+            if (currentPeriod != null) {
+                val updated = BillingPeriodHelper.buildPeriodFromExactDates(currentPeriod, closingDateMillis, dueDateMillis)
+                cardClosingPeriodRepository.update(updated)
             }
         }
     }
@@ -119,15 +111,19 @@ class CreditCardViewModel @Inject constructor(
         }
     }
 
-    fun updatePeriodDays(period: CardClosingPeriod, newClosingDay: Int, newDueDay: Int, fromThisMonthForward: Boolean) {
+    fun updatePeriodWithDates(period: CardClosingPeriod, closingMillis: Long, dueMillis: Long, fromThisMonthForward: Boolean) {
+        val closingCal = Calendar.getInstance().apply { timeInMillis = closingMillis }
+        val newClosingDay = closingCal.get(Calendar.DAY_OF_MONTH)
+        val newDueDay = Calendar.getInstance().apply { timeInMillis = dueMillis }.get(Calendar.DAY_OF_MONTH)
+        val dueDaysOffset = ((dueMillis - closingMillis) / (24L * 60 * 60 * 1000)).toInt()
         viewModelScope.launch {
             if (fromThisMonthForward) {
-                cardClosingPeriodRepository.updateFromMonth(period.cardId, period.month, newClosingDay, newDueDay)
+                cardClosingPeriodRepository.updateFromDates(period.cardId, period.month, newClosingDay, dueDaysOffset)
                 creditCardRepository.getCardById(period.cardId)?.let { card ->
                     creditCardRepository.updateCreditCard(card.copy(closingDay = newClosingDay, dueDay = newDueDay))
                 }
             } else {
-                val updated = BillingPeriodHelper.recalculatePeriod(period, newClosingDay, newDueDay)
+                val updated = BillingPeriodHelper.buildPeriodFromExactDates(period, closingMillis, dueMillis)
                 cardClosingPeriodRepository.update(updated)
                 if (period.month == BillingPeriodHelper.currentMonth()) {
                     creditCardRepository.getCardById(period.cardId)?.let { card ->

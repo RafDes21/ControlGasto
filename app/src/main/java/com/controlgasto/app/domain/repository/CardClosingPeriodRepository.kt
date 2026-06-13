@@ -10,6 +10,7 @@ interface CardClosingPeriodRepository {
     suspend fun insertAll(periods: List<CardClosingPeriod>)
     suspend fun update(period: CardClosingPeriod)
     suspend fun updateFromMonth(cardId: String, fromMonth: String, newClosingDay: Int, newDueDay: Int? = null)
+    suspend fun updateFromDates(cardId: String, fromMonth: String, closingDay: Int, dueDaysOffset: Int)
     suspend fun deleteByCardId(cardId: String)
     suspend fun syncToRoomOnLogout()
 }
