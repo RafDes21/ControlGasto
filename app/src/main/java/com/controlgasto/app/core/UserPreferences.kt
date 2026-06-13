@@ -26,6 +26,7 @@ class UserPreferences @Inject constructor(
     private val USER_EMAIL = stringPreferencesKey("user_email")
     private val USER_UID = stringPreferencesKey("user_uid")
     private val USER_DISPLAY_NAME = stringPreferencesKey("user_display_name")
+    private val DARK_MODE = booleanPreferencesKey("dark_mode")
 
     // Derivado de proExpiresAt: si la fecha de vencimiento es futura, el usuario es PRO
     val isProMode: Flow<Boolean> = context.dataStore.data
@@ -51,6 +52,14 @@ class UserPreferences @Inject constructor(
     val userDisplayName: Flow<String> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[USER_DISPLAY_NAME] ?: "" }
+
+    val isDarkMode: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[DARK_MODE] ?: false }
+
+    suspend fun setDarkMode(enabled: Boolean) {
+        context.dataStore.edit { it[DARK_MODE] = enabled }
+    }
 
     suspend fun setProMode(isPro: Boolean) {
         context.dataStore.edit { it[IS_PRO] = isPro }

@@ -261,18 +261,13 @@ class ExpenseViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            val month = BillingPeriodHelper.monthFromMillis(s.date)
-            val period = cardClosingPeriodRepository.getPeriodForCardAndMonth(cardId, month)
+            val period = cardClosingPeriodRepository.getPeriodContainingDate(cardId, s.date)
             if (period == null) {
                 _addState.value = _addState.value.copy(billingInfo = null, noPeriodForMonth = true)
                 return@launch
             }
-            val billingMonth = BillingPeriodHelper.calculateBillingPeriod(s.date, period)
-            val duePeriod = if (billingMonth == period.month) period
-                           else cardClosingPeriodRepository.getPeriodForCardAndMonth(cardId, billingMonth)
-            val dueDate = duePeriod?.dueDate ?: period.dueDate
             _addState.value = _addState.value.copy(
-                billingInfo = BillingPeriodInfo(period, billingMonth, dueDate),
+                billingInfo = BillingPeriodInfo(period, period.month, period.dueDate),
                 noPeriodForMonth = false
             )
         }
@@ -298,7 +293,7 @@ class ExpenseViewModel @Inject constructor(
             var billingPeriod: String? = null
 
             if (s.cardId != null) {
-                val period = cardClosingPeriodRepository.getPeriodForCardAndMonth(s.cardId, expenseMonth)
+                val period = cardClosingPeriodRepository.getPeriodContainingDate(s.cardId, s.date)
                 if (period == null) {
                     _addState.value = _addState.value.copy(
                         isLoading = false,
@@ -307,7 +302,7 @@ class ExpenseViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                billingPeriod = BillingPeriodHelper.calculateBillingPeriod(s.date, period)
+                billingPeriod = period.month
             }
 
             val expense = Expense(
