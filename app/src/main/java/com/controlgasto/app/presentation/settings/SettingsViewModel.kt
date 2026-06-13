@@ -22,7 +22,8 @@ data class SettingsUiState(
     val cards: List<CreditCard> = emptyList(),
     val isLoaded: Boolean = false,
     val showCancelWarningDialog: Boolean = false,
-    val showDowngradeDialog: Boolean = false
+    val showDowngradeDialog: Boolean = false,
+    val isDarkMode: Boolean = false
 )
 
 @HiltViewModel
@@ -40,8 +41,8 @@ class SettingsViewModel @Inject constructor(
         combine(userPreferences.isProMode, userPreferences.aiRequestsCount) { isPro, ai -> Pair(isPro, ai) },
         combine(userPreferences.userEmail, userPreferences.userDisplayName) { email, name -> Pair(email, name) },
         combine(authRepository.currentUser, creditCardRepository.getCreditCards()) { user, cards -> Pair(user, cards) },
-        combine(_showCancelWarningDialog, _showDowngradeDialog) { warning, downgrade -> Pair(warning, downgrade) }
-    ) { (isPro, aiCount), (email, displayName), (user, cards), (showWarning, showDowngrade) ->
+        combine(_showCancelWarningDialog, _showDowngradeDialog, userPreferences.isDarkMode) { warning, downgrade, dark -> Triple(warning, downgrade, dark) }
+    ) { (isPro, aiCount), (email, displayName), (user, cards), (showWarning, showDowngrade, dark) ->
         SettingsUiState(
             isProMode = isPro,
             aiRequestsUsed = aiCount,
@@ -52,7 +53,8 @@ class SettingsViewModel @Inject constructor(
             cards = cards,
             isLoaded = true,
             showCancelWarningDialog = showWarning,
-            showDowngradeDialog = showDowngrade
+            showDowngradeDialog = showDowngrade,
+            isDarkMode = dark
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -92,6 +94,12 @@ class SettingsViewModel @Inject constructor(
 
     fun cancelDowngrade() {
         _showDowngradeDialog.value = false
+    }
+
+    fun toggleDarkMode() {
+        viewModelScope.launch {
+            userPreferences.setDarkMode(!uiState.value.isDarkMode)
+        }
     }
 
     fun logout() {

@@ -63,6 +63,16 @@ class CardClosingPeriodRepositoryImpl @Inject constructor(
         else dao.getByCardIdAndMonth(cardId, month)?.toDomain()
     }
 
+    override suspend fun getPeriodContainingDate(cardId: String, dateMillis: Long): CardClosingPeriod? {
+        val currentUid = uid
+        return if (currentUid != null) {
+            firestoreSource.getPeriodsOnceForCard(currentUid, cardId)
+                .find { dateMillis in it.periodStart..it.periodEnd }
+        } else {
+            dao.getPeriodContainingDate(cardId, dateMillis)?.toDomain()
+        }
+    }
+
     override suspend fun insertAll(periods: List<CardClosingPeriod>) {
         val currentUid = uid
         if (currentUid != null) firestoreSource.insertAll(currentUid, periods)

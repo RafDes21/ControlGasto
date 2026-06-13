@@ -108,7 +108,9 @@ fun CreditCardsScreen(
                         periods = periods,
                         onDelete = { viewModel.deleteCard(card) },
                         onEdit = { name, lastFour, closingMillis, dueMillis, colorHex ->
-                            val currentPeriod = periods.find { it.month == BillingPeriodHelper.currentMonth() }
+                            val today = System.currentTimeMillis()
+                            val currentPeriod = periods.find { today in it.periodStart..it.periodEnd }
+                                ?: periods.filter { it.periodEnd >= today }.minByOrNull { it.periodEnd }
                             viewModel.updateCard(card, name, lastFour, closingMillis, dueMillis, colorHex, currentPeriod)
                         },
                         onUpdatePeriodWithDates = { period, closingMillis, dueMillis, fromForward ->
@@ -135,7 +137,12 @@ private fun CreditCardItem(
     var expanded by remember { mutableStateOf(false) }
     var periodToEdit by remember { mutableStateOf<CardClosingPeriod?>(null) }
 
-    val currentPeriod = remember(periods) { periods.find { it.month == BillingPeriodHelper.currentMonth() } }
+    val today = remember { System.currentTimeMillis() }
+    val currentPeriod = remember(periods) {
+        periods.find { today in it.periodStart..it.periodEnd }
+            ?: periods.filter { it.periodEnd >= today }.minByOrNull { it.periodEnd }
+            ?: periods.maxByOrNull { it.periodEnd }
+    }
     val displayClosing = currentPeriod?.let { BillingPeriodHelper.formatDateShort(it.periodEnd) }
         ?: "Día ${card.closingDay}"
     val displayDue = currentPeriod?.let { BillingPeriodHelper.formatDateShort(it.dueDate) }

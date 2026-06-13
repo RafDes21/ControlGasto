@@ -1,5 +1,6 @@
 package com.controlgasto.app
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -15,25 +16,41 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.compose.rememberNavController
+import com.controlgasto.app.core.UserPreferences
 import com.controlgasto.app.presentation.navigation.NavGraph
 import com.controlgasto.app.ui.theme.ControlGastoTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.core.net.toUri
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    @Inject lateinit var userPreferences: UserPreferences
     private val forceUpdateViewModel: ForceUpdateViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ControlGastoTheme {
+            val isDarkMode by userPreferences.isDarkMode.collectAsState(initial = false)
+            val view = LocalView.current
+            if (!view.isInEditMode) {
+                SideEffect {
+                    val window = (view.context as Activity).window
+                    val controller = WindowInsetsControllerCompat(window, view)
+                    controller.isAppearanceLightStatusBars = !isDarkMode
+                    controller.isAppearanceLightNavigationBars = !isDarkMode
+                }
+            }
+            ControlGastoTheme(darkTheme = isDarkMode) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
                     val updateState by forceUpdateViewModel.state.collectAsState()

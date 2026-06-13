@@ -12,6 +12,9 @@ interface CardClosingPeriodDao {
     @Query("SELECT * FROM card_closing_periods WHERE cardId = :cardId AND month = :month LIMIT 1")
     suspend fun getByCardIdAndMonth(cardId: String, month: String): CardClosingPeriodEntity?
 
+    @Query("SELECT * FROM card_closing_periods WHERE cardId = :cardId AND periodStart <= :dateMillis AND periodEnd >= :dateMillis LIMIT 1")
+    suspend fun getPeriodContainingDate(cardId: String, dateMillis: Long): CardClosingPeriodEntity?
+
     @Query("SELECT * FROM card_closing_periods WHERE dueDate >= :monthStart AND dueDate <= :monthEnd ORDER BY dueDate ASC")
     suspend fun getPeriodsForDueDateRange(monthStart: Long, monthEnd: Long): List<CardClosingPeriodEntity>
 

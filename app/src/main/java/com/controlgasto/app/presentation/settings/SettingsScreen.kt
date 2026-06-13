@@ -156,6 +156,32 @@ fun SettingsScreen(
                 }
             }
 
+            // Apariencia
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (state.isDarkMode) "🌙" else "☀️", style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Modo oscuro", fontWeight = FontWeight.Medium)
+                            Text(
+                                if (state.isDarkMode) "Activado" else "Desactivado",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(checked = state.isDarkMode, onCheckedChange = { viewModel.toggleDarkMode() })
+                }
+            }
+
             // Categorías
             SettingsCard(onClick = { navController.navigate(Screen.Categories.route) }) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
