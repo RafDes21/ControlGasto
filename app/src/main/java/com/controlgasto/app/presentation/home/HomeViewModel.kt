@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.controlgasto.app.core.UserPreferences
 import com.controlgasto.app.domain.model.Category
 import com.controlgasto.app.domain.model.Expense
+import com.controlgasto.app.domain.model.MonthlyIncome
 import com.controlgasto.app.domain.repository.AuthRepository
 import com.controlgasto.app.domain.repository.CardClosingPeriodRepository
 import com.controlgasto.app.domain.repository.CategoryRepository
 import com.controlgasto.app.domain.repository.CreditCardRepository
 import com.controlgasto.app.domain.repository.ExpenseRepository
+import com.controlgasto.app.domain.repository.MonthlyIncomeRepository
 import com.controlgasto.app.presentation.expense.CardExpenseGroup
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -30,7 +32,8 @@ data class HomeUiState(
     val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     val canGoNext: Boolean = false,
     val isLoading: Boolean = true,
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val monthlyIncome: MonthlyIncome? = null
 ) {
     val cardTotal: Double get() = cardGroups.sumOf { it.total }
 }
@@ -42,7 +45,8 @@ class HomeViewModel @Inject constructor(
     private val creditCardRepository: CreditCardRepository,
     private val cardClosingPeriodRepository: CardClosingPeriodRepository,
     private val userPreferences: UserPreferences,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val incomeRepository: MonthlyIncomeRepository
 ) : ViewModel() {
 
     private val now = Calendar.getInstance()
@@ -112,25 +116,31 @@ class HomeViewModel @Inject constructor(
         val (maxFutureYear, maxFutureMonth) = maxFuture
         val yearStr = String.format("%04d", year)
         val monthStr = String.format("%02d", month)
+        val monthKey = "$yearStr-$monthStr"
         val monthStart = monthStartMillis(year, month)
         val monthEnd = monthEndMillis(year, month)
         combine(
-            expenseRepository.getExpensesByMonth(yearStr, monthStr),
-            expenseRepository.getCreditExpensesByDueMonth(monthStart, monthEnd),
-            cardClosingPeriodRepository.getPeriodsForDueDateInMonthFlow(monthStart, monthEnd),
-            creditCardRepository.getCreditCards(),
-            categoryRepository.getCategories()
-        ) { allMonth, creditExpenses, periods, cards, categories ->
-            val cashExpenses = allMonth.filter { it.cardId == null }
-            val cardGroups = creditExpenses
-                .groupBy { it.cardId!! }
-                .mapNotNull { (cardId, expenses) ->
-                    val card = cards.find { it.id == cardId } ?: return@mapNotNull null
-                    val period = periods.find { it.cardId == cardId } ?: return@mapNotNull null
-                    CardExpenseGroup(card, period, expenses)
-                }
-                .sortedBy { it.period.dueDate }
-            buildUiState(cashExpenses, cardGroups, categories, isPro, aiCount, month, year, isLoggedIn, maxFutureYear, maxFutureMonth)
+            combine(
+                expenseRepository.getExpensesByMonth(yearStr, monthStr),
+                expenseRepository.getCreditExpensesByDueMonth(monthStart, monthEnd),
+                cardClosingPeriodRepository.getPeriodsForDueDateInMonthFlow(monthStart, monthEnd),
+                creditCardRepository.getCreditCards(),
+                categoryRepository.getCategories()
+            ) { allMonth, creditExpenses, periods, cards, categories ->
+                val cashExpenses = allMonth.filter { it.cardId == null }
+                val cardGroups = creditExpenses
+                    .groupBy { it.cardId!! }
+                    .mapNotNull { (cardId, expenses) ->
+                        val card = cards.find { it.id == cardId } ?: return@mapNotNull null
+                        val period = periods.find { it.cardId == cardId } ?: return@mapNotNull null
+                        CardExpenseGroup(card, period, expenses)
+                    }
+                    .sortedBy { it.period.dueDate }
+                buildUiState(cashExpenses, cardGroups, categories, isPro, aiCount, month, year, isLoggedIn, maxFutureYear, maxFutureMonth)
+            },
+            incomeRepository.getIncomeByMonth(monthKey)
+        ) { uiState, income ->
+            uiState.copy(monthlyIncome = income)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
 
@@ -185,6 +195,13 @@ class HomeViewModel @Inject constructor(
         val y = _selectedYear.value
         if (m == 12) { _selectedMonth.value = 1; _selectedYear.value = y + 1 }
         else _selectedMonth.value = m + 1
+    }
+
+    fun toggleIncomeVisibility() {
+        val income = uiState.value.monthlyIncome ?: return
+        viewModelScope.launch {
+            incomeRepository.saveIncome(income.copy(isHidden = !income.isHidden))
+        }
     }
 
     fun useAiRequest(onAllowed: () -> Unit, onBlocked: () -> Unit) {

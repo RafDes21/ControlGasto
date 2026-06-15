@@ -7,6 +7,7 @@ import com.controlgasto.app.data.local.dao.CardClosingPeriodDao
 import com.controlgasto.app.data.local.dao.CategoryDao
 import com.controlgasto.app.data.local.dao.CreditCardDao
 import com.controlgasto.app.data.local.dao.ExpenseDao
+import com.controlgasto.app.data.local.dao.MonthlyIncomeDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,4 +38,7 @@ object DatabaseModule {
 
     @Provides
     fun provideCardClosingPeriodDao(db: AppDatabase): CardClosingPeriodDao = db.cardClosingPeriodDao()
+
+    @Provides
+    fun provideMonthlyIncomeDao(db: AppDatabase): MonthlyIncomeDao = db.monthlyIncomeDao()
 }

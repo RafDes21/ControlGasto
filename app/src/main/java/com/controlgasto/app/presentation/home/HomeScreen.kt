@@ -1,6 +1,7 @@
 package com.controlgasto.app.presentation.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,7 +63,15 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             item { TopBar(state, navController) }
-            item { MonthSummaryCard(state, onPrev = { viewModel.previousMonth() }, onNext = { viewModel.nextMonth() }) }
+            item {
+                MonthSummaryCard(
+                    state = state,
+                    onPrev = { viewModel.previousMonth() },
+                    onNext = { viewModel.nextMonth() },
+                    onNavigateToIncomes = { navController.navigate(Screen.Incomes.route) },
+                    onToggleIncomeVisibility = { viewModel.toggleIncomeVisibility() }
+                )
+            }
             if (!state.isLoggedIn) {
                 item { CloudBackupBanner(onLogin = { navController.navigate(Screen.Login.route()) }) }
             }
@@ -230,12 +241,19 @@ private fun TopBar(state: HomeUiState, navController: NavController) {
 }
 
 @Composable
-private fun MonthSummaryCard(state: HomeUiState, onPrev: () -> Unit, onNext: () -> Unit) {
+private fun MonthSummaryCard(
+    state: HomeUiState,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onNavigateToIncomes: () -> Unit,
+    onToggleIncomeVisibility: () -> Unit
+) {
     val fmt = NumberFormat.getCurrencyInstance(Locale("es", "AR"))
-    val totalDisplay = state.monthlyTotal + state.cardTotal
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-    ) {
+    val compromiso = state.monthlyTotal + state.cardTotal
+    val income = state.monthlyIncome
+    val isHidden = income?.isHidden == true
+
+    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -244,11 +262,16 @@ private fun MonthSummaryCard(state: HomeUiState, onPrev: () -> Unit, onNext: () 
             Box(
                 modifier = Modifier.fillMaxWidth().background(
                     Brush.linearGradient(
-                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.75f))
+                        listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.80f)
+                        )
                     )
                 )
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
+
+                    // Navegación de mes
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -263,11 +286,7 @@ private fun MonthSummaryCard(state: HomeUiState, onPrev: () -> Unit, onNext: () 
                             color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.SemiBold
                         )
-                        IconButton(
-                            onClick = onNext,
-                            modifier = Modifier.size(32.dp),
-                            enabled = state.canGoNext
-                        ) {
+                        IconButton(onClick = onNext, modifier = Modifier.size(32.dp), enabled = state.canGoNext) {
                             Icon(
                                 Icons.Default.KeyboardArrowRight,
                                 contentDescription = "Mes siguiente",
@@ -275,37 +294,138 @@ private fun MonthSummaryCard(state: HomeUiState, onPrev: () -> Unit, onNext: () 
                             )
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Total del mes", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        fmt.format(totalDisplay),
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    if (state.cardTotal > 0) {
-                        Spacer(Modifier.height(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column {
-                                Text("Efectivo", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
-                                Text(fmt.format(state.monthlyTotal), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+
+                    Spacer(Modifier.height(10.dp))
+
+                    // Ingreso | Compromiso
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Columna izquierda: Ingreso del mes
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "Ingreso del mes",
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                if (income != null) {
+                                    IconButton(
+                                        onClick = onToggleIncomeVisibility,
+                                        modifier = Modifier.size(24.dp).padding(start = 4.dp)
+                                    ) {
+                                        Icon(
+                                            if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = if (isHidden) "Mostrar" else "Ocultar",
+                                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
                             }
-                            Column {
-                                Text("Tarjetas", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
-                                Text(fmt.format(state.cardTotal), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(4.dp))
+                            if (income == null) {
+                                Text(
+                                    "Agregar +",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
+                                    modifier = Modifier.clickable { onNavigateToIncomes() }
+                                )
+                            } else if (isHidden) {
+                                Text(
+                                    "••••••",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.clickable { onNavigateToIncomes() }
+                                )
+                            } else {
+                                Text(
+                                    fmt.format(income.amount),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.clickable { onNavigateToIncomes() }
+                                )
                             }
+                        }
+
+                        // Separador vertical
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(52.dp)
+                                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f))
+                        )
+
+                        // Columna derecha: Compromiso
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Text(
+                                "Compromiso",
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                fmt.format(compromiso),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (compromiso > 0)
+                                    MaterialTheme.colorScheme.errorContainer
+                                else
+                                    MaterialTheme.colorScheme.onPrimary
+                            )
                         }
                     }
-                    if (state.categoryTotals.isNotEmpty()) {
+
+                    // Te queda disponible (solo si hay ingreso)
+                    if (income != null) {
                         Spacer(Modifier.height(12.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
-                        Spacer(Modifier.height(8.dp))
-                        state.categoryTotals.entries.take(3).forEach { (cat, amount) ->
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("${cat.icon} ${cat.name}", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
-                                Text(fmt.format(amount), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                            }
+                        Spacer(Modifier.height(10.dp))
+
+                        val disponible = income.amount - compromiso
+                        val isPositive = disponible >= 0
+
+                        Text(
+                            "Te queda disponible",
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Spacer(Modifier.height(2.dp))
+
+                        if (isHidden) {
+                            Text(
+                                "••••••",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text(
+                                fmt.format(if (isPositive) disponible else -disponible),
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                if (isPositive)
+                                    "💰 Esto es lo que te queda después de tus gastos y tarjetas."
+                                else
+                                    "⚠️ Tus gastos superan tu ingreso del mes.",
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
+                        Spacer(Modifier.height(10.dp))
+                    } else {
+                        Spacer(Modifier.height(12.dp))
                     }
                 }
             }

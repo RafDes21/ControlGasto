@@ -3,19 +3,22 @@ package com.controlgasto.app.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabase.Callback
+import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.controlgasto.app.data.local.dao.CardClosingPeriodDao
 import com.controlgasto.app.data.local.dao.CategoryDao
 import com.controlgasto.app.data.local.dao.CreditCardDao
 import com.controlgasto.app.data.local.dao.ExpenseDao
+import com.controlgasto.app.data.local.dao.MonthlyIncomeDao
 import com.controlgasto.app.data.local.entity.CardClosingPeriodEntity
 import com.controlgasto.app.data.local.entity.CategoryEntity
 import com.controlgasto.app.data.local.entity.CreditCardEntity
 import com.controlgasto.app.data.local.entity.ExpenseEntity
+import com.controlgasto.app.data.local.entity.MonthlyIncomeEntity
 
 @Database(
-    entities = [ExpenseEntity::class, CategoryEntity::class, CreditCardEntity::class, CardClosingPeriodEntity::class],
-    version = 6,
+    entities = [ExpenseEntity::class, CategoryEntity::class, CreditCardEntity::class, CardClosingPeriodEntity::class, MonthlyIncomeEntity::class],
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun creditCardDao(): CreditCardDao
     abstract fun cardClosingPeriodDao(): CardClosingPeriodDao
+    abstract fun monthlyIncomeDao(): MonthlyIncomeDao
 
     companion object {
         const val DATABASE_NAME = "controlgasto_db"
@@ -46,9 +50,22 @@ abstract class AppDatabase : RoomDatabase() {
                 insertDefaultCategories(db)
             }
 
+            // onDestructiveMigration se llama ANTES de que Room recree las tablas,
+            // por eso no insertamos aquí — lo hacemos en onOpen donde las tablas ya existen
             override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
                 super.onDestructiveMigration(db)
-                insertDefaultCategories(db)
+            }
+
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                var isEmpty = false
+                val cursor = db.query(SimpleSQLiteQuery("SELECT COUNT(*) FROM categories"))
+                try {
+                    isEmpty = cursor.moveToFirst() && cursor.getInt(0) == 0
+                } finally {
+                    cursor.close()
+                }
+                if (isEmpty) insertDefaultCategories(db)
             }
 
             private fun insertDefaultCategories(db: SupportSQLiteDatabase) {

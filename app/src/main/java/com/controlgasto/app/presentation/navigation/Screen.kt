@@ -18,4 +18,5 @@ sealed class Screen(val route: String) {
     object Stats : Screen("stats")
     object UpgradePro : Screen("settings/upgrade")
     object Profile : Screen("settings/profile")
+    object Incomes : Screen("incomes")
 }

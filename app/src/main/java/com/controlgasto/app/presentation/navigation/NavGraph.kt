@@ -14,6 +14,7 @@ import com.controlgasto.app.presentation.categories.CategoriesScreen
 import com.controlgasto.app.presentation.expense.AddExpenseScreen
 import com.controlgasto.app.presentation.expense.ExpenseListScreen
 import com.controlgasto.app.presentation.home.HomeScreen
+import com.controlgasto.app.presentation.income.IncomesScreen
 import com.controlgasto.app.presentation.profile.ProfileScreen
 import com.controlgasto.app.presentation.settings.SettingsScreen
 import com.controlgasto.app.presentation.splash.SplashScreen
@@ -47,5 +48,6 @@ fun NavGraph(navController: NavHostController) {
         composable(Screen.Stats.route) { StatsScreen(navController) }
         composable(Screen.UpgradePro.route) { UpgradeProScreen(navController) }
         composable(Screen.Profile.route) { ProfileScreen(navController) }
+        composable(Screen.Incomes.route) { IncomesScreen(navController) }
     }
 }

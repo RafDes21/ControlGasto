@@ -5,11 +5,13 @@ import com.controlgasto.app.data.repository.CardClosingPeriodRepositoryImpl
 import com.controlgasto.app.data.repository.CategoryRepositoryImpl
 import com.controlgasto.app.data.repository.CreditCardRepositoryImpl
 import com.controlgasto.app.data.repository.ExpenseRepositoryImpl
+import com.controlgasto.app.data.repository.MonthlyIncomeRepositoryImpl
 import com.controlgasto.app.domain.repository.AuthRepository
 import com.controlgasto.app.domain.repository.CardClosingPeriodRepository
 import com.controlgasto.app.domain.repository.CategoryRepository
 import com.controlgasto.app.domain.repository.CreditCardRepository
 import com.controlgasto.app.domain.repository.ExpenseRepository
+import com.controlgasto.app.domain.repository.MonthlyIncomeRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -34,4 +36,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindCardClosingPeriodRepository(impl: CardClosingPeriodRepositoryImpl): CardClosingPeriodRepository
+
+    @Binds @Singleton
+    abstract fun bindMonthlyIncomeRepository(impl: MonthlyIncomeRepositoryImpl): MonthlyIncomeRepository
 }

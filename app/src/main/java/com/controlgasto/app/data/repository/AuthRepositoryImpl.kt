@@ -7,6 +7,7 @@ import com.controlgasto.app.domain.repository.CardClosingPeriodRepository
 import com.controlgasto.app.domain.repository.CategoryRepository
 import com.controlgasto.app.domain.repository.CreditCardRepository
 import com.controlgasto.app.domain.repository.ExpenseRepository
+import com.controlgasto.app.domain.repository.MonthlyIncomeRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +30,8 @@ class AuthRepositoryImpl @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val creditCardRepository: CreditCardRepository,
     private val cardClosingPeriodRepository: CardClosingPeriodRepository,
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val incomeRepository: MonthlyIncomeRepository
 ) : AuthRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -97,6 +99,7 @@ class AuthRepositoryImpl @Inject constructor(
         expenseRepository.syncToRoomOnLogout()
         creditCardRepository.syncToRoomOnLogout()
         cardClosingPeriodRepository.syncToRoomOnLogout()
+        incomeRepository.syncToRoomOnLogout()
         firebaseAuth.signOut()
         _currentUser.value = null
         prefs.clearUserSession()
